@@ -1,0 +1,399 @@
+---
+title: "Breast Cancer Prediction"
+author: "REKHA-MAULISHREE"
+date: "4/18/2022"
+output: html_document
+---
+
+
+## Import Library 
+```{r echo=TRUE} 
+library('plyr')
+library(tidyverse)
+library(gridExtra)
+library(dplyr)
+library(corrplot)
+library(caret)
+library(ggplot2)
+library(GGally)
+
+
+```
+
+## Loading the Dataset:
+```{r echo=TRUE} 
+
+data=read.csv("E:/Essentials of Data Analytics/project/data.csv")
+head(data)
+```
+
+## 33rd column is not right so removing the column
+```{r echo=TRUE}
+data$X <- NULL
+data <- data[,-1]
+data$diagnosis <- factor(ifelse(data$diagnosis=="B","Benign","Malignant"))
+
+head(data)
+```
+
+
+## Inspect the datasets
+```{r echo=TRUE}
+str(data)
+summary(data)
+```
+
+
+## Checking for NA values
+```{r echo=TRUE}
+print("Number of null values:")
+sum(is.na(data))
+## No NA values in the data set
+```
+
+
+## EDA for the dataset
+```{r echo=TRUE}
+ggplot(data = data, aes(x = diagnosis, fill = diagnosis)) +
+geom_bar()+geom_text(stat='count', aes(label=..count..), vjust=-1) +
+labs(title = 'Diagnosis of Breast Cancer',x = 'Diagnosis', y = 'Number of observations')
+
+## Most of the diagnosis (63%) are Benign
+```
+
+## Frequency Table
+```{r echo=TRUE}
+prop.table(table(data$diagnosis))
+```
+
+
+## Histogram for every variable
+```{r echo=TRUE}
+a1<-ggplot(data,aes(x=data[,3])) + geom_histogram(bins = 50)+xlab("radius_mean")
+a2<-ggplot(data,aes(x=data[,4])) + geom_histogram(bins = 50)+xlab("texture_mean")
+a3<-ggplot(data,aes(x=data[,5])) + geom_histogram(bins = 50)+xlab("perimeter_mean")
+a4<-ggplot(data,aes(x=data[,6])) + geom_histogram(bins = 50)+xlab("area_mean")
+a5<-ggplot(data,aes(x=data[,7])) + geom_histogram(bins = 50)+xlab("smoothness_mean")
+a6<-ggplot(data,aes(x=data[,8])) + geom_histogram(bins = 50)+xlab("compactness_mean")
+a7<-ggplot(data,aes(x=data[,9])) + geom_histogram(bins = 50)+xlab("concavity_mean")
+a8<-ggplot(data,aes(x=data[,10])) + geom_histogram(bins = 50)+xlab("concave.points_mean")
+a9<-ggplot(data,aes(x=data[,11])) + geom_histogram(bins = 50)+xlab("symmetry_se")
+a10<-ggplot(data,aes(x=data[,12])) + geom_histogram(bins = 50)+xlab("fractal_dimension_se")
+grid.arrange(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, nrow=4, widths=c(1,1,1))
+```
+
+# The most variables of the dataset are normally distributed as show with the below plot
+```{r echo=TRUE}
+library('funModeling')
+plot_num(data, bins=10)
+```
+
+
+## correlation graph
+```{r echo=TRUE}
+corr_mat <- cor(data[,3:ncol(data)])
+corrplot(corr_mat, tl.cex = 1, addrect = 8)
+
+#There is a great correlation between some variables
+```
+
+
+
+## How do both types differ in size?
+```{r echo=TRUE}
+ggplot(data = data, 
+       aes(x = radius_mean, y = perimeter_mean, color = diagnosis)) +
+  geom_point() +
+  geom_hline(yintercept = 116.0, linetype = 'dashed', color = 'gray')+
+  geom_vline(xintercept = 18.00, linetype = 'dashed', color = 'gray')+
+  labs(title = 'Mean Perimeter and Mean Radius',
+       x = 'Mean Radius', y = 'Mean Perimeter') 
+
+
+
+## 'Malignant lumps can get relatively bigger than benigns'
+## '45% of malignants are bigger than every observed benign',
+# Insights from graph
+## Malignant lumps can get relatively bigger than benign lumps. 
+## This has the possibility of sparking up a hypothesis that malignant lumps begin as benigns. 
+## The data as it stands has no time variable hence that would be difficult to establish with what we have. 
+## However, bigger lumps are more likely to be malignants.
+```
+
+## How do both lumps differ in textured variations?
+```{r echo=TRUE}
+## How do both lumps differ in textured variations?
+
+ggplot(data = data, 
+       aes(x = texture_mean, y = smoothness_mean, color = diagnosis)) +
+  geom_point()+
+  geom_vline(xintercept =  18.84, linetype = 'dashed', color = 'gray') +
+  labs(title = 'Mean Texture and Smoothess of Lumps',
+       x = 'Mean Texture', y = 'Mean Smoothness') +
+  annotate('text', label = 'median = 18.84', x = 22, y = 0.160,
+           size = 2.5)
+
+## 'Most benigns (66%) are below the median mean texture'
+### Insights from Texture and Smoothness Visualization
+## Not a lot of variation can be seen in the mean smoothness of both diagnosis as they all seem to clustered from the bottom to the upper midsection of the plot. However we can observe that most of the malignants (66%) are skewed to the right side of the median. 
+## This connotes that malignant lumps display higher texture variation values than benigns.
+```
+
+
+## Compactness and Concavity
+```{r echo=TRUE}
+## Compactness and Concavity
+
+ggplot(data = data, 
+       aes(x = compactness_mean, y = concavity_mean, color = diagnosis)) +
+  geom_point()+geom_smooth()+labs(title = 'Mean Compactness and Mean Concavity',x = 'Mean Compactness', y = 'Mean Concavity')
+
+## 'Most benigns display less concavity and compactness',
+
+## Insight from Compactness and Concavity
+
+#There is a clear display of outliers within the data. 
+#However a visual analysis reveals that benign lumps tend to have low mean concavity and a low mean compactness. 
+#This can is manifested in the benigns being skewed towards the bottom left side of the graph. 
+#Notice that the malignants are displaying a wider range from low concavity and low compactness to high concavity and high compactness.
+
+#This visualization suggests that benigns usually have low to medium severe concaves at the contours of the lumps however malignant lumps can display anywhere between low and very high concavity and compactness.
+```
+
+## Concave points and Fractal dimensions
+```{r echo=TRUE}
+# Concave points and Fractal dimensions
+
+ggplot(data = data, 
+       aes(x = fractal_dimension_mean, y = concave.points_mean, color = diagnosis)) +
+  geom_point()+
+  geom_hline(yintercept = 0.03350, linetype = 'dashed', color = 'gray')+
+  labs(title = 'Mean Concave Points and Fractal Dimensions',
+       x = 'Mean Fractal Dimension', y = 'Mean Concave Points') +
+annotate('text', label = 'median = 0.03350', x = 0.09, y = 0.04,
+           size = 2.3)
+
+#'95% of malignants are above the Median of Mean Concave Points'
+
+## Insights from Concave Points and Fractal Dimensions
+
+# In terms of factal dimensions, there is not enough difference between malignant and benign lumps. 
+# However, there is a major difference when it comes to the mean concave points observed amongst both diagnosis. 
+# 95% of the malignant diagnosed lumps are above the 50th percentile of the observations.
+
+# This suggests that a visual analysis of malignant lumps are likely to display more concave points (severe/sharp curvatures) than benign lumps.
+```
+
+
+
+### Modelling the dataset
+```{r echo=TRUE}
+set.seed(345)
+data1<-sample(2,nrow(data),replace = T,prob = c(0.75,0.25))
+
+train<-data[data1==1,]
+head(train)
+test<-data[data1==2,]
+head(test)
+```
+
+## Check the proportion of diagnosis (Benign / Malignant)
+```{r echo=TRUE}
+prop.table(table(train$diagnosis))
+prop.table(table(test$diagnosis))
+```
+
+
+## PCA
+```{r echo=TRUE}
+data<-data[,-1]
+all_pca <- prcomp(data[,-1], cor=TRUE, scale = TRUE)
+summary(all_pca)
+```
+
+
+## Applying the ML Algorithms
+#SVM MODEL
+```{r echo=TRUE}
+library(e1071)
+#svm_Linear
+
+learn_svm = svm(diagnosis~ .,data = train)
+pre_svm <- predict(learn_svm, test[,-1])
+cm_svm <- confusionMatrix(pre_svm, test$diagnosis)
+cm_svm
+```
+
+
+
+## Random Forest
+```{r echo=TRUE}
+library(randomForest)
+learn_rf<- randomForest(diagnosis~., data=train, ntree=1000)
+pre_rf<- predict(learn_rf, test[,-1])
+cm_rf <- confusionMatrix(pre_rf, test$diagnosis)
+cm_rf
+```
+
+
+
+## KNN
+```{r echo=TRUE}
+model_knn <- train(diagnosis~.,train,method="knn",tuneLength=10,preProcess = c('center', 'scale'))
+pred_knn <- predict(model_knn, test)
+cm_knn <- confusionMatrix(pred_knn, test$diagnosis, positive = "Malignant")
+cm_knn
+```
+
+
+```{r echo=TRUE}
+## C5 DECISION TREE
+library(C50)
+
+learn_c50 <- C5.0(train[,-1],train$diagnosis)
+pre_c50 <- predict(learn_c50, test[,-1])
+cm_c50 <- confusionMatrix(pre_c50, test$diagnosis)
+cm_c50
+```
+
+
+```{r echo=TRUE}
+##ctree
+
+library(party)
+learn_ct <- ctree(diagnosis~., data=train, controls=ctree_control(maxdepth=2))
+pre_ct   <- predict(learn_ct, test[,-1])
+cm_ct    <- confusionMatrix(pre_ct, test$diagnosis)
+cm_ct
+
+```
+
+
+```{r echo=TRUE}
+gamma <- seq(0,0.1,0.005)
+cost <- 2^(0:5)
+parms <- expand.grid(cost=cost, gamma=gamma)  
+
+
+acc_test <- numeric()
+accuracy1 <- NULL; accuracy2 <- NULL
+
+for(i in 1:NROW(parms)){        
+        learn_svm <- svm(diagnosis~., data=train, gamma=parms$gamma[i], cost=parms$cost[i])
+        pre_svm <- predict(learn_svm, test[,-1])
+        accuracy1 <- confusionMatrix(pre_svm, test$diagnosis)
+        accuracy2[i] <- accuracy1$overall[1]
+}
+
+acc <- data.frame(p= seq(1,NROW(parms)), cnt = accuracy2)
+
+opt_p <- subset(acc, cnt==max(cnt))[1,]
+sub <- paste("Optimal number of parameter is", opt_p$p, "(accuracy :", opt_p$cnt,") in SVM")
+
+library(highcharter)
+hchart(acc, 'line', hcaes(p, cnt)) %>%
+  hc_title(text = "Accuracy With Varying Parameters (SVM)") %>%
+  hc_subtitle(text = sub) %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_xAxis(title = list(text = "Number of Parameters")) %>%
+  hc_yAxis(title = list(text = "Accuracy"))
+
+learn_imp_svm <- svm(diagnosis~., data=train, cost=parms$cost[opt_p$p], gamma=parms$gamma[opt_p$p])
+pre_imp_svm <- predict(learn_imp_svm, test[,-1])
+cm_imp_svm <- confusionMatrix(pre_imp_svm, test$diagnosis)
+cm_imp_svm
+```
+
+
+```{r echo=TRUE}
+
+fitControl <- trainControl(method="cv", #Control the computational nuances of thetrainfunction
+number = 15, #Either the number of folds or number of resampling iteratio
+classProbs = TRUE,
+summaryFunction = twoClassSummary)
+
+
+
+
+
+model_randomforest <- train(diagnosis~.,
+train,
+method="rf", #also recommended ranger, because it is a lot faster than origmetric="ROC",
+#tuneLength=10,
+#tuneGrid = expand.grid(mtry = c(2, 3, 6)),
+preProcess = c('center', 'scale'),
+trControl=fitControl)
+prediction_randomforest <- predict(model_randomforest, test)
+#Check results
+confusionmatrix_randomforest <- confusionMatrix(prediction_randomforest, test$diagnosis, positive='Malignant')
+confusionmatrix_randomforest
+
+
+model_knn <- train(diagnosis~.,
+train,
+method="knn",
+metric="ROC",
+preProcess = c('center', 'scale'),
+tuneLength=10, #The tuneLength parameter tells the algorithm to try different defaul#In this case we used 10 default values
+trControl=fitControl)
+prediction_knn <- predict(model_knn, test)
+confusionmatrix_knn <- confusionMatrix(prediction_knn, test$diagnosis, positive = "Malignant")
+confusionmatrix_knn
+
+
+model_logreg<- train(diagnosis ~., data = train, method = "glm",
+metric = "ROC",
+preProcess = c("scale", "center"), # in order to normalize the data
+trControl= fitControl)
+prediction_logreg<- predict(model_logreg, test)
+# Check results
+confusionmatrix_logreg <- confusionMatrix(prediction_logreg, test$diagnosis, positive = "Malignant")
+confusionmatrix_logreg
+
+
+model_nnet_pca <- train(diagnosis~.,
+train,
+method="nnet",
+metric="ROC",
+preProcess=c('center', 'scale', 'pca'),
+tuneLength=10,
+trace=FALSE,
+trControl=fitControl)
+prediction_nnet_pca <- predict(model_nnet_pca, test)
+confusionmatrix_nnet_pca <- confusionMatrix(prediction_nnet_pca, test$diagnosis, positive = "Malignant")
+confusionmatrix_nnet_pca
+
+```
+
+
+```{r echo=TRUE}
+##compare the models:
+
+model_list <- list (KNN = model_knn,RF=model_randomforest,LR=model_logreg,NNet=model_nnet_pca)
+model_list
+
+models_results <- resamples(model_list)
+
+#model_cor <- modelCor(models_results)
+#corrplot(model_cor)
+```
+
+
+
+```{r echo=TRUE}
+
+confusionmatrix_list <- list(
+SVM=cm_svm,
+Logistic_regr=confusionmatrix_logreg,
+Random_Forest=confusionmatrix_randomforest,
+KNN=confusionmatrix_knn,
+Neural_PCA=confusionmatrix_nnet_pca)
+confusionmatrix_list_results <- sapply(confusionmatrix_list, function(x) x$byClass)
+confusionmatrix_list_results
+
+
+```
+
+
+
+
